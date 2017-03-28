@@ -1,7 +1,7 @@
 import pandapower as pp
 import pandapower.networks as ppnets
 import pandapower.plotting as ppplot
-import pandapower.topology as pptop
+from pandapower.topology import create_nxgraph, connected_components
 
 import numpy as np
 
@@ -63,10 +63,11 @@ except:
 
 logger = logging.getLogger(__name__)
 
-def create_bus_trace(net, buses=None, size=5, marker_type="circle", color=None, hoverinfo=None,
-                          cmap=False, cmap_name='Jet', cmap_vals=None, cbar_title='Bus Voltage [pu]', cmin=0.9, cmax=1.1, **kwargs):
+def create_bus_trace(net, buses=None, size=5, marker_type="circle", color=None, hoverinfo=None, trace_name = 'buses',
+                     cmap=False, cmap_name='Jet', cmap_vals=None, cbar_title='Bus Voltage [pu]',
+                     cmin=0.9, cmax=1.1, **kwargs):
 
-    bus_trace = Scatter(x=[], y=[], text=[], mode='markers', hoverinfo='text', name='buses',
+    bus_trace = Scatter(x=[], y=[], text=[], mode='markers', hoverinfo='text', name=trace_name,
                         marker=Marker(color=color, size=size, symbol=marker_type))
 
     # all the bus coordinates need to be positive in plotly
@@ -92,7 +93,7 @@ def create_bus_trace(net, buses=None, size=5, marker_type="circle", color=None, 
 
     if cmap:
         # if color map is set
-        cmap_vals = net.res_bus.loc[buses2plot.index,'vm_pu'] if cmap_vals is None else cmap_vals
+        cmap_vals = net.res_bus.loc[buses2plot.index, 'vm_pu'] if cmap_vals is None else cmap_vals
         bus_trace['marker'] = Marker(size=size,
                                      cmax=cmax,  # bus_volt_pu.max()
                                      cmin=cmin,  # bus_volt_pu.min(),
@@ -108,7 +109,7 @@ def create_bus_trace(net, buses=None, size=5, marker_type="circle", color=None, 
 
 
 def create_line_trace(net, lines=None, use_line_geodata=True,
-                      respect_switches=False, width=1.0, color='grey', hoverinfo=None,
+                      respect_switches=False, width=1.0, color='grey', hoverinfo=None, trace_name = 'lines',
                       cmap=False, cbar_title="Line Loading [%]", cmap_name='jet', cmin=0, cmax=100, **kwargs):
 
     # defining lines to be plot
@@ -125,6 +126,7 @@ def create_line_trace(net, lines=None, use_line_geodata=True,
     lines_mask = net.line.index.isin(lines)
     lines2plot = net.line[~nogolines_mask & lines_mask]
 
+    use_line_geodata = use_line_geodata if net.line_geodata.shape[0] > 0 else False
     if use_line_geodata:
         lines_with_geodata = lines2plot.index.isin(net.line_geodata.index)
         lines2plot = lines2plot[lines_with_geodata]
@@ -147,7 +149,7 @@ def create_line_trace(net, lines=None, use_line_geodata=True,
         col_i = 0
         for idx, line in lines2plot.iterrows():
             line_trace = Scatter(x=[], y=[], text=[], line=Line(width=width, color=color),
-                                 hoverinfo='text', mode='lines', name='lines')
+                                 hoverinfo='text', mode='lines', name=trace_name)
 
             if use_line_geodata:
                 line_coords = net.line_geodata.loc[idx, 'coords']
@@ -187,7 +189,7 @@ def create_line_trace(net, lines=None, use_line_geodata=True,
     else:
 
         line_trace = Scatter(x=[], y=[], text=[], line=Line(width=width, color=color),
-                             hoverinfo='text', mode='lines', name='lines')
+                             hoverinfo='text', mode='lines', name=trace_name)
 
         if use_line_geodata:
             for line_ind, line in lines2plot.iterrows():
@@ -211,12 +213,38 @@ def create_line_trace(net, lines=None, use_line_geodata=True,
 
         line_traces = [line_trace]
 
+    if len(nogolines) > 0:
+        line_trace = Scatter(x=[], y=[], text=[], line=Line(width=width/2, color='grey', dash='dash'),
+                             hoverinfo='text', mode='lines', name='disconnected lines')
+        lines2plot = net.line.loc[nogolines]
+        if use_line_geodata:
+            for line_ind, line in lines2plot.iterrows():
+                line_coords = net.line_geodata.loc[line_ind, 'coords']
+                linex, liney = list(zip(*line_coords))
+                line_trace['x'] += linex
+                line_trace['x'] += [None]
+                line_trace['y'] += liney
+                line_trace['y'] += [None]
+        else:
+            # getting x and y values from bus_geodata for from and to side of each line
+            for xy in ['x', 'y']:
+                from_bus = net.bus_geodata.loc[lines2plot.from_bus, xy].tolist()
+                to_bus = net.bus_geodata.loc[lines2plot.to_bus, xy].tolist()
+                # center point added because of the hovertool
+                center = (np.array(from_bus) + np.array(to_bus)) / 2
+                None_list = [None] * len(from_bus)
+                line_trace[xy] = np.array([from_bus, center, to_bus, None_list]).T.flatten()
+
+        line_trace['text'] = lines2plot.name.tolist()
+
+        line_traces.append(line_trace)
+
 
     return line_traces
 
 
 
-def create_trafo_trace(net, trafos=None, color = 'green', width = 5, hoverinfo=None,
+def create_trafo_trace(net, trafos=None, color = 'green', width = 5, hoverinfo=None, trace_name = 'trafos',
                       cmap=False, cbar_title="Line Loading [%]", cmap_name='jet', cmin=None, cmax=None, **kwargs):
 
     # defining lines to be plot
@@ -244,7 +272,7 @@ def create_trafo_trace(net, trafos=None, color = 'green', width = 5, hoverinfo=N
         col_i = 0
         for trafo_ind, trafo in tarfo2plot.iterrows():
             trafo_trace = Scatter(x=[], y=[], text=[], line=Line(width=width, color=cmap_colors[col_i]),
-                                  hoverinfo='text', mode='lines', name='trafos')
+                                  hoverinfo='text', mode='lines', name=trace_name)
 
             trafo_trace['text'] = trafo.name.tolist() if hoverinfo is None else hoverinfo[col_i]
 
@@ -258,14 +286,14 @@ def create_trafo_trace(net, trafos=None, color = 'green', width = 5, hoverinfo=N
 
     else:
         trafo_trace = Scatter(x=[], y=[], text=[], line=Line(width=width, color=color),
-                             hoverinfo='text', mode='lines', name='trafos')
+                             hoverinfo='text', mode='lines', name=trace_name)
 
         trafo_trace['text'] = tarfo2plot.name.tolist() if hoverinfo is None else hoverinfo
         for trafo_ind, trafo in tarfo2plot.iterrows():
             for xy in ['x', 'y']:
                 from_bus = net.bus_geodata.loc[trafo.hv_bus, xy]
                 to_bus = net.bus_geodata.loc[trafo.lv_bus, xy]
-                trafo_trace[xy] = [from_bus, (from_bus + to_bus)/2, to_bus, None]
+                trafo_trace[xy] += [from_bus, (from_bus + to_bus)/2, to_bus, None]
 
         trafo_traces = [trafo_trace]
 
@@ -289,7 +317,7 @@ def create_extgrid_trace(net, color=color_yellow, size=20, symbol='square'):
 
 
 
-def draw_traces(net, traces, showlegend = True, aspectratio = False):
+def draw_traces(net, traces, showlegend = True, aspectratio = False, with_geo = False):
 
     # setting Figure object
     fig = Figure(data=Data(traces),   # edge_trace
@@ -306,6 +334,9 @@ def draw_traces(net, traces, showlegend = True, aspectratio = False):
                          x=0.005, y=-0.002)],
                      xaxis=XAxis(showgrid=False, zeroline=False, showticklabels=False),
                      yaxis=YAxis(showgrid=False, zeroline=False, showticklabels=False)))
+
+    if with_geo:
+        fig['layout']['geo'] = dict(resolution=50, scope='europe',showframe=False, showland=True)
 
     if aspectratio:
         xrange = net.bus_geodata.x.max() - net.bus_geodata.x.min()
@@ -327,13 +358,12 @@ def draw_traces(net, traces, showlegend = True, aspectratio = False):
 
 def simple_plotly(net=None, respect_switches=False, line_width=1.0, bus_size=10, ext_grid_size=20.0,
                 bus_color=colors[0][1], line_color='grey', trafo_color='green', ext_grid_color=color_yellow,
-                  aspectratio = None):
+                  aspectratio = False):
 
     if net is None:
         import pandapower.networks as nw
         logger.warning("No pandapower network provided -> Plotting mv_oberrhein")
         net = nw.mv_oberrhein()
-
 
     # create geocoord if none are available
     # TODO remove this if not necessary:
@@ -345,16 +375,12 @@ def simple_plotly(net=None, respect_switches=False, line_width=1.0, bus_size=10,
         logger.warning("No or insufficient geodata available --> Creating artificial coordinates." +
                        " This may take some time")
         create_generic_coordinates(net, respect_switches=respect_switches)
-        if aspectratio is None:
-            aspectratio = False
-    else:
-        if aspectratio is None:
-            aspectratio = True
+
 
 
     # ----- Buses ------
     # initializating bus trace
-    bus_trace = create_bus_trace(net, net.bus.index, size=bus_size, colors=bus_color)
+    bus_trace = create_bus_trace(net, net.bus.index, size=bus_size, color=bus_color)
 
 
     # ----- Lines ------
@@ -379,8 +405,7 @@ def simple_plotly(net=None, respect_switches=False, line_width=1.0, bus_size=10,
     draw_traces(net, line_trace + bus_trace + trafo_trace + ext_grid_trace, aspectratio=aspectratio)
 
 
-
-def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10):
+def vlevel_plotly(net, cmap_list=None, line_width=3.0, bus_size=10, aspectratio = False, respect_switches=False):
     if 'res_bus' not in net or net.get('res_bus').shape[0] == 0:
         logger.warning('There are no Power Flow results. A Newton-Raphson power flow will be executed.')
         pp.runpp(net)
@@ -395,9 +420,65 @@ def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10):
         logger.warning("No or insufficient geodata available --> Creating artificial coordinates." +
                        " This may take some time")
         create_generic_coordinates(net, respect_switches=True)
-        aspectratio = False
-    else:
-        aspectratio = True
+
+
+    cmap_list_def = [(400,'red'),(220,'green'),(110,'blue'),(20,'green'),(10,'blue'),(0.4,'red')]
+    cmap_list = cmap_list_def if cmap_list is None else cmap_list
+    cmap_dict = dict(cmap_list)
+    cmap,norm = ppplot.cmap_continous(cmap_list)
+
+    # getting connected componenets without consideration of trafos
+    graph = create_nxgraph(net, include_trafos=False)
+    vlev_buses = connected_components(graph)
+    # getting unique sets of buses for each voltage level
+    vlev_dict = {}
+    for vl_buses in vlev_buses:
+        if net.bus.loc[vl_buses, 'vn_kv'].unique().shape[0] > 1:
+            logger.warning('buses from the same voltage level does not have the same vn_kv !?')
+        vn_kv = net.bus.loc[vl_buses, 'vn_kv'].unique()[0]
+        if vlev_dict.get(vn_kv):
+            vlev_dict[vn_kv].update(vl_buses)
+        else:
+            vlev_dict[vn_kv] = vl_buses
+
+    # creating traces for buses and lines for each voltage level
+    bus_traces = []
+    line_traces = []
+    for vn_kv, buses_vl in vlev_dict.items():
+
+        vlev_color = cmap_dict[vn_kv]
+        bus_trace_vlev = create_bus_trace(net, buses=buses_vl, size=bus_size,
+                                          color=vlev_color, trace_name='buses {0} kV'.format(vn_kv))
+        if bus_trace_vlev is not None:
+            bus_traces += bus_trace_vlev
+
+        vlev_lines = net.line[net.line.from_bus.isin(buses_vl) & net.line.to_bus.isin(buses_vl)].index.tolist()
+        line_trace_vlev = create_line_trace(net, lines=vlev_lines, use_line_geodata=True,
+                                            respect_switches=respect_switches,
+                                            color=vlev_color, linewidth=line_width, trace_name='lines {0} kV'.format(vn_kv))
+        if line_trace_vlev is not None:
+            line_traces += line_trace_vlev
+
+    trafo_traces = create_trafo_trace(net, color='gray', width=5)
+
+    draw_traces(net, line_traces + trafo_traces + bus_traces, showlegend=True, aspectratio=aspectratio)
+
+
+def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10, aspectratio=False):
+    if 'res_bus' not in net or net.get('res_bus').shape[0] == 0:
+        logger.warning('There are no Power Flow results. A Newton-Raphson power flow will be executed.')
+        pp.runpp(net)
+
+    # create geocoord if none are available
+    # TODO remove this if not necessary:
+    if 'line_geodata' not in net:
+        net.line_geodata = pd.DataFrame(columns=['coords'])
+    if 'bus_geodata' not in net:
+        net.bus_geodata = pd.DataFrame(columns=["x", "y"])
+    if len(net.line_geodata) == 0 and len(net.bus_geodata) == 0:
+        logger.warning("No or insufficient geodata available --> Creating artificial coordinates." +
+                       " This may take some time")
+        create_generic_coordinates(net, respect_switches=True)
 
     # ----- Buses ------
     # initializating bus trace
@@ -450,6 +531,7 @@ def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10):
 if __name__ == "__main__":
     # net = ppnets.example_simple()
     net = ppnets.mv_oberrhein()
+    ppnets.create_kerber_vorstadtnetz_kabel_1()
     # net = ppnets.create_cigre_network_lv()
     del net.bus_geodata #delete the geocoordinates
     del net.line_geodata
@@ -458,6 +540,6 @@ if __name__ == "__main__":
 
     # G = pptop.create_nxgraph(net)
 
-    # simple_plotly(net, respect_switches=True)
-    pf_res_plotly(net)
-    # ppplot.simple_plot(net)
+    simple_plotly(net, respect_switches=True)
+    # pf_res_plotly(net)
+    # vlevel_plotly(net)
