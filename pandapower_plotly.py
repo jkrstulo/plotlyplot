@@ -534,12 +534,12 @@ if __name__ == "__main__":
     net = ppnets.case24_ieee_rts()
     # net = ppnets.create_cigre_network_lv()
     # del net.bus_geodata #delete the geocoordinates
-    # del net.line_geodata
+    del net.line_geodata
     # create_generic_coordinates(net, respect_switches=True)
     # ppplot.simple_plot(net)
 
     # G = pptop.create_nxgraph(net)
 
     # simple_plotly(net, respect_switches=True)
-    # pf_res_plotly(net)
-    vlevel_plotly(net)
+    pf_res_plotly(net)
+    # vlevel_plotly(net)
