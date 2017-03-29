@@ -482,9 +482,9 @@ def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10, aspectratio
 
     # ----- Buses ------
     # initializating bus trace
-    idx = net.line.index
+    idx = net.bus.index
     # hoverinfo which contains name and pf results
-    hoverinfo = (net.bus.name + '<br>' +
+    hoverinfo = (net.bus.name.astype(str) + '<br>' +
                  'U = ' + net.res_bus.loc[idx, 'vm_pu'].astype(str) + ' pu' + '<br>' +
                  'U = ' + (net.res_bus.loc[idx, 'vm_pu'] * net.bus.vn_kv).astype(str) + ' kV' + '<br>' +
                  'ang = ' + net.res_bus.loc[idx, 'va_degree'].astype(str) + ' deg'
@@ -497,7 +497,7 @@ def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10, aspectratio
     use_line_geodata = False if net.line_geodata.shape[0] == 0 else True
     idx = net.line.index
     # hoverinfo which contains name and pf results
-    hoverinfo = (net.line.name + '<br>' +
+    hoverinfo = (net.line.name.astype(str) + '<br>' +
                  'I = ' + net.res_line.loc[idx, 'loading_percent'].astype(str) + ' %' + '<br>' +
                  'I_from = ' + net.res_line.loc[idx, 'i_from_ka'].astype(str) + ' kA' + '<br>' +
                  'I_to = ' + net.res_line.loc[idx, 'i_to_ka'].astype(str) + ' kA' + '<br>'
@@ -510,7 +510,7 @@ def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10, aspectratio
     # ----- Trafos ------
     idx = net.trafo.index
     # hoverinfo which contains name and pf results
-    hoverinfo = (net.trafo.name + '<br>' +
+    hoverinfo = (net.trafo.name.astype(str) + '<br>' +
                  'I = ' + net.res_trafo.loc[idx, 'loading_percent'].astype(str) + ' %' + '<br>' +
                  'I_hv = ' + net.res_trafo.loc[idx, 'i_hv_ka'].astype(str) + ' kA' + '<br>'  +
                  'I_lv = ' + net.res_trafo.loc[idx, 'i_lv_ka'].astype(str) + ' kA' + '<br>'
@@ -530,16 +530,16 @@ def pf_res_plotly(net, cmap_name='jet', line_width=3.0, bus_size=10, aspectratio
 
 if __name__ == "__main__":
     # net = ppnets.example_simple()
-    net = ppnets.mv_oberrhein()
-    ppnets.create_kerber_vorstadtnetz_kabel_1()
+    # net = ppnets.mv_oberrhein()
+    net = ppnets.case24_ieee_rts()
     # net = ppnets.create_cigre_network_lv()
-    del net.bus_geodata #delete the geocoordinates
-    del net.line_geodata
+    # del net.bus_geodata #delete the geocoordinates
+    # del net.line_geodata
     # create_generic_coordinates(net, respect_switches=True)
     # ppplot.simple_plot(net)
 
     # G = pptop.create_nxgraph(net)
 
-    simple_plotly(net, respect_switches=True)
+    # simple_plotly(net, respect_switches=True)
     # pf_res_plotly(net)
-    # vlevel_plotly(net)
+    vlevel_plotly(net)
