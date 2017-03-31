@@ -566,11 +566,11 @@ def pf_res_plotly(net, cmap_name='jet', on_map=False, map_style='basic', line_wi
 
 if __name__ == "__main__":
     # net = ppnets.example_simple()
-    # net = ppnets.mv_oberrhein()
-    net = ppnets.case24_ieee_rts()
+    net = ppnets.mv_oberrhein()
+    # net = ppnets.case24_ieee_rts()
     # net = ppnets.create_cigre_network_lv()
     # del net.bus_geodata #delete the geocoordinates
-    del net.line_geodata
+    # del net.line_geodata
     # create_generic_coordinates(net, respect_switches=True)
     # ppplot.simple_plot(net)
 
